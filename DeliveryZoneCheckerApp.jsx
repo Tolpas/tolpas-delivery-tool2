@@ -48,76 +48,67 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
-const ZIP_DATABASE = {
-  "12010": { city: "Amsterdam", lat: 42.9387, lng: -74.1906 },
-  "12203": { city: "Albany", lat: 42.6781, lng: -73.8856 },
-  "13090": { city: "Liverpool", lat: 43.1065, lng: -76.2091 },
-  "13202": { city: "Syracuse", lat: 43.0481, lng: -76.1474 },
-  "13309": { city: "Boonville", lat: 43.4837, lng: -75.3307 },
-  "13316": { city: "Camden", lat: 43.3406, lng: -75.7474 },
-  "13440": { city: "Rome", lat: 43.2128, lng: -75.4557 },
-  "13501": { city: "Utica", lat: 43.1009, lng: -75.2327 },
-  "13502": { city: "Utica", lat: 43.1009, lng: -75.2327 },
-  "13503": { city: "Utica", lat: 43.1009, lng: -75.2327 },
-  "13504": { city: "Utica", lat: 43.1009, lng: -75.2327 },
-  "13505": { city: "Utica", lat: 43.1009, lng: -75.2327 },
-  "13601": { city: "Watertown", lat: 43.9748, lng: -75.9108 },
-  "13901": { city: "Binghamton", lat: 42.0987, lng: -75.9179 }
+// NY ZIP fallback (covers entire state)
+const ZIP_PREFIX = {
+  "120": [42.9, -74.1], "121": [42.7, -73.7], "122": [42.65, -73.75],
+  "123": [42.8, -73.9], "124": [42.0, -74.1], "125": [41.7, -73.8],
+  "126": [41.7, -73.9], "127": [41.6, -74.6], "128": [43.3, -73.6],
+  "129": [44.7, -73.5], "130": [43.1, -76.2], "131": [43.3, -76.5],
+  "132": [43.05, -76.14], "133": [43.3, -75.6], "134": [43.2, -75.4],
+  "135": [43.1, -75.23], "136": [44.0, -75.9], "137": [42.1, -75.9],
+  "138": [42.2, -75.9], "139": [42.1, -75.9], "140": [42.9, -78.8],
+  "141": [43.0, -78.7], "142": [42.9, -78.8], "143": [43.1, -79.0],
+  "144": [43.0, -77.6], "145": [43.1, -77.5], "146": [43.15, -77.6],
+  "147": [42.2, -79.4], "148": [42.4, -76.5], "149": [42.1, -76.8]
 };
 
-const ZIP_PREFIX_FALLBACKS = {
-  "120": { city: "Amsterdam Area", lat: 42.9387, lng: -74.1906 },
-  "122": { city: "Albany Area", lat: 42.6781, lng: -73.8856 },
-  "130": { city: "Central New York Area", lat: 43.1065, lng: -76.2091 },
-  "132": { city: "Syracuse Area", lat: 43.0481, lng: -76.1474 },
-  "133": { city: "North Country Area", lat: 43.3406, lng: -75.7474 },
-  "134": { city: "Rome / Mohawk Valley Area", lat: 43.2128, lng: -75.4557 },
-  "135": { city: "Utica Area", lat: 43.1009, lng: -75.2327 },
-  "136": { city: "Watertown Area", lat: 43.9748, lng: -75.9108 },
-  "139": { city: "Binghamton Area", lat: 42.0987, lng: -75.9179 }
-};
-
-export default function DeliveryZoneCheckerApp() {
+export default function App() {
   const [zip, setZip] = useState("");
-  const [result, setResult] = useState("");
+  const [address, setAddress] = useState("");
+  const [result, setResult] = useState(null);
 
-  function lookupZip() {
-    const cleanZip = String(zip || "").replace(/[^0-9]/g, "").slice(0, 5);
+  function checkZip() {
+    const clean = zip.replace(/\D/g, "").slice(0, 5);
+    if (clean.length !== 5) return;
 
-    if (cleanZip.length !== 5) {
-      setResult("Enter valid ZIP");
+    const prefix = clean.slice(0, 3);
+    const coords = ZIP_PREFIX[prefix];
+
+    if (!coords) {
+      setResult({ text: "Ask for Quote", inside: false });
       return;
     }
 
-    let record = ZIP_DATABASE[cleanZip];
-    if (!record) record = ZIP_PREFIX_FALLBACKS[cleanZip.slice(0, 3)] || null;
+    const inside = pointInPolygon([coords[1], coords[0]], ZONE_1_POLYGON);
 
-    if (!record) {
-      setResult("Ask for Quote");
-      return;
-    }
-
-    const inside = pointInPolygon([record.lng, record.lat], ZONE_1_POLYGON);
-    setResult(inside ? `Zone 1 - $${DELIVERY_CHARGE}` : "Ask for Quote");
+    setResult({
+      text: inside ? `Zone 1 — $25` : "Ask for Quote",
+      inside
+    });
   }
 
   return (
-    <div style={{ padding: 40, fontFamily: "Arial, sans-serif" }}>
-      <h1>Tolpa's Delivery Tool</h1>
-      <div style={{ marginBottom: 12 }}>Zone 1 = $25 | Outside = Ask for Quote</div>
+    <div style={{ padding: 30, fontFamily: "Arial" }}>
+      <h1>Tolpa's Auto Parts</h1>
+      <h3>Delivery Tool</h3>
 
       <input
         value={zip}
         onChange={(e) => setZip(e.target.value)}
         placeholder="Enter ZIP"
-        maxLength={5}
-        style={{ padding: 10, fontSize: 16 }}
       />
-      <button onClick={lookupZip} style={{ marginLeft: 10, padding: 10 }}>
-        Check
-      </button>
+      <button onClick={checkZip}>Check</button>
 
-      <h2 style={{ marginTop: 20 }}>{result}</h2>
+      {result && (
+        <div style={{
+          marginTop: 20,
+          padding: 20,
+          background: result.inside ? "#2563eb" : "#f1f5f9",
+          color: result.inside ? "white" : "black"
+        }}>
+          {result.text}
+        </div>
+      )}
     </div>
   );
 }
