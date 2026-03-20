@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import logo from "./logo.jpg";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
@@ -265,7 +266,11 @@ export default function DeliveryZoneCheckerApp() {
     <div style={{ padding: 24, fontFamily: "Arial, sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ background: "#0f172a", color: "white", borderRadius: 20, padding: 20, marginBottom: 20 }}>
-          <h1 style={{ margin: 0 }}>Tolpa&apos;s Auto Parts</h1>
+          <img 
+  src={logo} 
+  alt="Tolpa's Auto Parts" 
+  style={{ height: 60, objectFit: "contain" }} 
+/>
           <div style={{ marginTop: 6 }}>Delivery Tool</div>
           <div style={{ marginTop: 6, fontSize: 13 }}>Zone 1 = $25 | Outside = Ask for Quote</div>
         </div>
