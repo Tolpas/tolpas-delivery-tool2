@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
 const DELIVERY_CHARGE = 25;
 
@@ -48,67 +52,206 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
-// NY ZIP fallback (covers entire state)
 const ZIP_PREFIX = {
-  "120": [42.9, -74.1], "121": [42.7, -73.7], "122": [42.65, -73.75],
-  "123": [42.8, -73.9], "124": [42.0, -74.1], "125": [41.7, -73.8],
-  "126": [41.7, -73.9], "127": [41.6, -74.6], "128": [43.3, -73.6],
-  "129": [44.7, -73.5], "130": [43.1, -76.2], "131": [43.3, -76.5],
-  "132": [43.05, -76.14], "133": [43.3, -75.6], "134": [43.2, -75.4],
-  "135": [43.1, -75.23], "136": [44.0, -75.9], "137": [42.1, -75.9],
-  "138": [42.2, -75.9], "139": [42.1, -75.9], "140": [42.9, -78.8],
-  "141": [43.0, -78.7], "142": [42.9, -78.8], "143": [43.1, -79.0],
-  "144": [43.0, -77.6], "145": [43.1, -77.5], "146": [43.15, -77.6],
-  "147": [42.2, -79.4], "148": [42.4, -76.5], "149": [42.1, -76.8]
+  "120": [42.9387, -74.1906],
+  "121": [42.7000, -73.7000],
+  "122": [42.6781, -73.8856],
+  "123": [42.8000, -73.9000],
+  "124": [42.0000, -74.1000],
+  "125": [41.7000, -73.8000],
+  "126": [41.7000, -73.9000],
+  "127": [41.6000, -74.6000],
+  "128": [43.3000, -73.6000],
+  "129": [44.7000, -73.5000],
+  "130": [43.1000, -76.2000],
+  "131": [43.3000, -76.5000],
+  "132": [43.0481, -76.1474],
+  "133": [43.3000, -75.6000],
+  "134": [43.2128, -75.4557],
+  "135": [43.1009, -75.2327],
+  "136": [43.9748, -75.9108],
+  "137": [42.1000, -75.9000],
+  "138": [42.2000, -75.9000],
+  "139": [42.0987, -75.9179],
+  "140": [42.9000, -78.8000],
+  "141": [43.0000, -78.7000],
+  "142": [42.9000, -78.8000],
+  "143": [43.1000, -79.0000],
+  "144": [43.0000, -77.6000],
+  "145": [43.1000, -77.5000],
+  "146": [43.1500, -77.6000],
+  "147": [42.2000, -79.4000],
+  "148": [42.4000, -76.5000],
+  "149": [42.1000, -76.8000]
 };
 
-export default function App() {
+export default function DeliveryZoneCheckerApp() {
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+
   const [zip, setZip] = useState("");
   const [address, setAddress] = useState("");
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState("");
+
+  useEffect(() => {
+    if (!mapContainerRef.current || !mapboxgl.accessToken) return;
+
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: "mapbox://styles/mapbox/standard",
+      center: [-75.2, 43.1],
+      zoom: 6
+    });
+
+    mapRef.current.on("load", () => {
+      mapRef.current.addSource("zone1", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [ZONE_1_POLYGON]
+          }
+        }
+      });
+
+      mapRef.current.addLayer({
+        id: "zone1-fill",
+        type: "fill",
+        source: "zone1",
+        paint: {
+          "fill-color": "#2563eb",
+          "fill-opacity": 0.25
+        }
+      });
+
+      mapRef.current.addLayer({
+        id: "zone1-outline",
+        type: "line",
+        source: "zone1",
+        paint: {
+          "line-color": "#2563eb",
+          "line-width": 2
+        }
+      });
+    });
+
+    return () => {
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  function setPointResult(lat, lng, label) {
+    const inside = pointInPolygon([lng, lat], ZONE_1_POLYGON);
+    setResult(inside ? `Zone 1 — $${DELIVERY_CHARGE}` : "Ask for Quote");
+
+    if (mapRef.current) {
+      if (markerRef.current) markerRef.current.remove();
+      markerRef.current = new mapboxgl.Marker().setLngLat([lng, lat]).addTo(mapRef.current);
+      mapRef.current.flyTo({ center: [lng, lat], zoom: 8 });
+    }
+  }
 
   function checkZip() {
     const clean = zip.replace(/\D/g, "").slice(0, 5);
-    if (clean.length !== 5) return;
-
-    const prefix = clean.slice(0, 3);
-    const coords = ZIP_PREFIX[prefix];
-
+    if (clean.length !== 5) {
+      setResult("Enter valid ZIP");
+      return;
+    }
+    const coords = ZIP_PREFIX[clean.slice(0, 3)];
     if (!coords) {
-      setResult({ text: "Ask for Quote", inside: false });
+      setResult("Ask for Quote");
+      return;
+    }
+    setPointResult(coords[0], coords[1], clean);
+  }
+
+  async function checkAddress() {
+    if (!address.trim()) {
+      setResult("Enter address");
       return;
     }
 
-    const inside = pointInPolygon([coords[1], coords[0]], ZONE_1_POLYGON);
+    const url =
+      `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}` +
+      `&country=US&region=NY&access_token=${mapboxgl.accessToken}`;
 
-    setResult({
-      text: inside ? `Zone 1 — $25` : "Ask for Quote",
-      inside
-    });
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.features || !data.features.length) {
+      setResult("Address not found");
+      return;
+    }
+
+    const [lng, lat] = data.features[0].geometry.coordinates;
+    setPointResult(lat, lng, address);
   }
 
   return (
-    <div style={{ padding: 30, fontFamily: "Arial" }}>
-      <h1>Tolpa's Auto Parts</h1>
-      <h3>Delivery Tool</h3>
-
-      <input
-        value={zip}
-        onChange={(e) => setZip(e.target.value)}
-        placeholder="Enter ZIP"
-      />
-      <button onClick={checkZip}>Check</button>
-
-      {result && (
-        <div style={{
-          marginTop: 20,
-          padding: 20,
-          background: result.inside ? "#2563eb" : "#f1f5f9",
-          color: result.inside ? "white" : "black"
-        }}>
-          {result.text}
+    <div style={{ padding: 24, fontFamily: "Arial, sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ background: "#0f172a", color: "white", borderRadius: 20, padding: 20, marginBottom: 20 }}>
+          <h1 style={{ margin: 0 }}>Tolpa&apos;s Auto Parts</h1>
+          <div style={{ marginTop: 6 }}>Delivery Tool</div>
+          <div style={{ marginTop: 6, fontSize: 13 }}>Zone 1 = $25 | Outside = Ask for Quote</div>
         </div>
-      )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 20 }}>
+          <div style={{ background: "white", borderRadius: 20, padding: 20, border: "1px solid #e2e8f0" }}>
+            <h2 style={{ marginTop: 0 }}>Lookup</h2>
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ marginBottom: 8, fontWeight: 700 }}>ZIP Code</div>
+              <input
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                placeholder="Enter ZIP"
+                maxLength={5}
+                style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #cbd5e1" }}
+              />
+              <button onClick={checkZip} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: 0, background: "#0f172a", color: "white", fontWeight: 700 }}>
+                Check ZIP
+              </button>
+            </div>
+
+            <div>
+              <div style={{ marginBottom: 8, fontWeight: 700 }}>Street Address</div>
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Enter full address"
+                style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #cbd5e1" }}
+              />
+              <button onClick={checkAddress} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "1px solid #cbd5e1", background: "white", color: "#0f172a", fontWeight: 700 }}>
+                Check Address
+              </button>
+            </div>
+
+            <div style={{
+              marginTop: 20,
+              padding: 18,
+              borderRadius: 16,
+              background: result.startsWith("Zone 1") ? "#2563eb" : "#f1f5f9",
+              color: result.startsWith("Zone 1") ? "white" : "#0f172a",
+              minHeight: 70
+            }}>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>Delivery Result</div>
+              <div style={{ fontSize: 28, fontWeight: 700, marginTop: 6 }}>{result || "Enter ZIP or address"}</div>
+            </div>
+          </div>
+
+          <div style={{ background: "white", borderRadius: 20, padding: 12, border: "1px solid #e2e8f0" }}>
+            {!mapboxgl.accessToken ? (
+              <div style={{ padding: 20 }}>Map token missing in Vercel environment variables.</div>
+            ) : (
+              <div ref={mapContainerRef} style={{ height: 650, borderRadius: 14, overflow: "hidden" }} />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
