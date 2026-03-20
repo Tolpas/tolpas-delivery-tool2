@@ -4,7 +4,17 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-<div ref={mapContainerRef} style={{ height: 650, borderRadius: 14, overflow: "hidden" }} />
+<div
+  ref={mapContainerRef}
+  style={{
+    height: 650,
+    width: "100%",
+    minHeight: 650,
+    borderRadius: 14,
+    overflow: "hidden",
+    background: "#e2e8f0"
+  }}
+/>
 
 const DELIVERY_CHARGE = 25;
 
