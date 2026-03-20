@@ -4,6 +4,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
+<div ref={mapContainerRef} style={{ height: 650, borderRadius: 14, overflow: "hidden" }} />
+
 const DELIVERY_CHARGE = 25;
 
 const ZONE_1_POLYGON = [
