@@ -96,55 +96,58 @@ export default function DeliveryZoneCheckerApp() {
   const [address, setAddress] = useState("");
   const [result, setResult] = useState("");
 
-  useEffect(() => {
-    if (!mapContainerRef.current || !mapboxgl.accessToken) return;
+ useEffect(() => {
+  if (!mapContainerRef.current || !mapboxgl.accessToken) return;
 
-    mapRef.current = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: "mapbox://styles/mapbox/standard",
-      center: [-75.2, 43.1],
-      zoom: 6
+  mapRef.current = new mapboxgl.Map({
+    container: mapContainerRef.current,
+    style: "mapbox://styles/mapbox/streets-v12",
+    center: [-75.2, 43.1],
+    zoom: 6
+  });
+
+  mapRef.current.on("load", () => {
+    mapRef.current.resize();
+
+    mapRef.current.addSource("zone1", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[...ZONE_1_POLYGON, ZONE_1_POLYGON[0]]]
+        }
+      }
     });
 
-    mapRef.current.on("load", () => {
-      mapRef.current.addSource("zone1", {
-        type: "geojson",
-        data: {
-          type: "Feature",
-          geometry: {
-            type: "Polygon",
-            coordinates: [ZONE_1_POLYGON]
-          }
-        }
-      });
-
-      mapRef.current.addLayer({
-        id: "zone1-fill",
-        type: "fill",
-        source: "zone1",
-        paint: {
-          "fill-color": "#2563eb",
-          "fill-opacity": 0.25
-        }
-      });
-
-      mapRef.current.addLayer({
-        id: "zone1-outline",
-        type: "line",
-        source: "zone1",
-        paint: {
-          "line-color": "#2563eb",
-          "line-width": 2
-        }
-      });
+    mapRef.current.addLayer({
+      id: "zone1-fill",
+      type: "fill",
+      source: "zone1",
+      paint: {
+        "fill-color": "#2563eb",
+        "fill-opacity": 0.25
+      }
     });
 
-    return () => {
-      mapRef.current?.remove();
+    mapRef.current.addLayer({
+      id: "zone1-outline",
+      type: "line",
+      source: "zone1",
+      paint: {
+        "line-color": "#2563eb",
+        "line-width": 2
+      }
+    });
+  });
+
+  return () => {
+    if (mapRef.current) {
+      mapRef.current.remove();
       mapRef.current = null;
-    };
-  }, []);
-
+    }
+  };
+}, []);
   function setPointResult(lat, lng, label) {
     const inside = pointInPolygon([lng, lat], ZONE_1_POLYGON);
     setResult(inside ? `Zone 1 — $${DELIVERY_CHARGE}` : "Ask for Quote");
