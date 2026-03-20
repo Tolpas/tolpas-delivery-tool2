@@ -4,18 +4,6 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 
-<div
-  ref={mapContainerRef}
-  style={{
-    height: 650,
-    width: "100%",
-    minHeight: 650,
-    borderRadius: 14,
-    overflow: "hidden",
-    background: "#e2e8f0"
-  }}
-/>
-
 const DELIVERY_CHARGE = 25;
 
 const ZONE_1_POLYGON = [
@@ -50,20 +38,6 @@ const ZONE_1_POLYGON = [
   [-75.8156016,44.2553902]
 ];
 
-function pointInPolygon(point, polygon) {
-  const [x, y] = point;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-    const intersect =
-      yi > y !== yj > y &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
 const ZIP_PREFIX = {
   "120": [42.9387, -74.1906],
   "121": [42.7000, -73.7000],
@@ -97,6 +71,20 @@ const ZIP_PREFIX = {
   "149": [42.1000, -76.8000]
 };
 
+function pointInPolygon(point, polygon) {
+  const [x, y] = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect =
+      yi > y !== yj > y &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 export default function DeliveryZoneCheckerApp() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -106,59 +94,60 @@ export default function DeliveryZoneCheckerApp() {
   const [address, setAddress] = useState("");
   const [result, setResult] = useState("");
 
- useEffect(() => {
-  if (!mapContainerRef.current || !mapboxgl.accessToken) return;
+  useEffect(() => {
+    if (!mapContainerRef.current || !mapboxgl.accessToken) return;
 
-  mapRef.current = new mapboxgl.Map({
-    container: mapContainerRef.current,
-    style: "mapbox://styles/mapbox/streets-v12",
-    center: [-75.2, 43.1],
-    zoom: 6
-  });
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [-75.2, 43.1],
+      zoom: 6
+    });
 
-  mapRef.current.on("load", () => {
-    mapRef.current.resize();
+    mapRef.current.on("load", () => {
+      mapRef.current.resize();
 
-    mapRef.current.addSource("zone1", {
-      type: "geojson",
-      data: {
-        type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [[...ZONE_1_POLYGON, ZONE_1_POLYGON[0]]]
+      mapRef.current.addSource("zone1", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: [[...ZONE_1_POLYGON, ZONE_1_POLYGON[0]]]
+          }
         }
-      }
+      });
+
+      mapRef.current.addLayer({
+        id: "zone1-fill",
+        type: "fill",
+        source: "zone1",
+        paint: {
+          "fill-color": "#2563eb",
+          "fill-opacity": 0.25
+        }
+      });
+
+      mapRef.current.addLayer({
+        id: "zone1-outline",
+        type: "line",
+        source: "zone1",
+        paint: {
+          "line-color": "#2563eb",
+          "line-width": 2
+        }
+      });
     });
 
-    mapRef.current.addLayer({
-      id: "zone1-fill",
-      type: "fill",
-      source: "zone1",
-      paint: {
-        "fill-color": "#2563eb",
-        "fill-opacity": 0.25
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
       }
-    });
+    };
+  }, []);
 
-    mapRef.current.addLayer({
-      id: "zone1-outline",
-      type: "line",
-      source: "zone1",
-      paint: {
-        "line-color": "#2563eb",
-        "line-width": 2
-      }
-    });
-  });
-
-  return () => {
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
-  };
-}, []);
-  function setPointResult(lat, lng, label) {
+  function setPointResult(lat, lng) {
     const inside = pointInPolygon([lng, lat], ZONE_1_POLYGON);
     setResult(inside ? `Zone 1 — $${DELIVERY_CHARGE}` : "Ask for Quote");
 
@@ -180,7 +169,7 @@ export default function DeliveryZoneCheckerApp() {
       setResult("Ask for Quote");
       return;
     }
-    setPointResult(coords[0], coords[1], clean);
+    setPointResult(coords[0], coords[1]);
   }
 
   async function checkAddress() {
@@ -202,7 +191,7 @@ export default function DeliveryZoneCheckerApp() {
     }
 
     const [lng, lat] = data.features[0].geometry.coordinates;
-    setPointResult(lat, lng, address);
+    setPointResult(lat, lng);
   }
 
   return (
@@ -262,7 +251,17 @@ export default function DeliveryZoneCheckerApp() {
             {!mapboxgl.accessToken ? (
               <div style={{ padding: 20 }}>Map token missing in Vercel environment variables.</div>
             ) : (
-              <div ref={mapContainerRef} style={{ height: 650, borderRadius: 14, overflow: "hidden" }} />
+              <div
+                ref={mapContainerRef}
+                style={{
+                  height: 650,
+                  width: "100%",
+                  minHeight: 650,
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  background: "#e2e8f0"
+                }}
+              />
             )}
           </div>
         </div>
